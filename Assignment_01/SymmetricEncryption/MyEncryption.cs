@@ -30,10 +30,10 @@ namespace SymmetricEncryption
             EncryptionType.GenerateIV();
             //check the key's size
             var key = Encoding.ASCII.GetBytes(pass);
-            if (!EncryptionType.ValidKeySize(key.Length))
+            if (!EncryptionType.ValidKeySize(key.Length*8))
                 return false;
             EncryptionType.Key = key;
-            EncryptionType.KeySize = key.Length;
+            //EncryptionType.KeySize = key.Length*8;
             //
             //set padding mode
             EncryptionType.Padding = padMode == 0 ? PaddingMode.PKCS7 : PaddingMode.ISO10126;
@@ -119,7 +119,8 @@ namespace SymmetricEncryption
                 else
                     myEncryption = new TripleDESCryptoServiceProvider();
                 //
-                myEncryption.KeySize = BitConverter.ToInt32(LenKey, 0);
+                //myEncryption.KeySize = BitConverter.ToInt32(LenKey, 0);
+                myEncryption.Key = Encoding.ASCII.GetBytes(pass);
                 byte[] iv = new byte[BitConverter.ToInt32(LenIV, 0)];
                 inFs.Read(iv, 0, iv.Length);
 
@@ -137,7 +138,7 @@ namespace SymmetricEncryption
                     int offset = 0;
                    
                     // blockSizeBytes can be any arbitrary size.
-                    int blockSizeBytes = my.BlockSize / 8;
+                    int blockSizeBytes = myEncryption.BlockSize / 8;
                     byte[] data = new byte[blockSizeBytes];
 
 
@@ -147,7 +148,7 @@ namespace SymmetricEncryption
 
                     // Start at the beginning
                     // of the cipher text.
-                    inFs.Seek(startC, SeekOrigin.Begin);
+                    inFs.Seek(20 + iv.Length, SeekOrigin.Begin);
                     using (CryptoStream outStreamDecrypted = new CryptoStream(outFs, transform, CryptoStreamMode.Write))
                     {
                         do

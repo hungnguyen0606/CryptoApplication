@@ -14,6 +14,9 @@ namespace SymmetricEncryption
        
         static void Main(string[] args)
         {
+            //TripleDESCryptoServiceProvider h = new TripleDESCryptoServiceProvider();
+            
+            //Console.WriteLine(h.KeySize);
             //Console.Write("Hello");
             //string s = Console.ReadLine();
             //string[] ss = s.Split(new char[] {' '}, StringSplitOptions.RemoveEmptyEntries);
@@ -36,13 +39,17 @@ namespace SymmetricEncryption
             {
                 Console.WriteLine("Choose encryption's type.\n\t0. AES\n\t1. 3Des\nChoose type (0/1): ");
                 int et = Convert.ToInt32(Console.ReadLine());
-                Console.WriteLine("Choose Padding mode.\n\t0. PKCS3\n\t1. 3Des\nChoose type (0/1): ");
+                Console.WriteLine("Choose Padding mode.\n\t0. PKCS7\n\t1. ISO10126\nChoose type (0/1): ");
                 int padMode = Convert.ToInt32(Console.ReadLine());
                 Console.WriteLine("Choose Mode of Operation.\n\t0. CBC\n\t1. 3CFB\nChoose type (0/1): ");
                 int ciMode = Convert.ToInt32(Console.ReadLine());
-                Console.Write("Enter your password: ");
+                Console.Write("Enter your password (24 chars for 3DES | 15 chars for AES): ");
                 string pass = Console.ReadLine();
                 bool isEncrypt = myEn.Encrypt(src, des, pass, et, padMode, ciMode);
+                if (isEncrypt)
+                    Console.WriteLine("Encrypt successfully.");
+                else
+                    Console.WriteLine("Fail to Encrypt");
             }
             else
             {

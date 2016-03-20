@@ -29,7 +29,10 @@ namespace SymmetricEncryption
         public string genRandomString(int len)
         {
             StringBuilder ret = new StringBuilder();
-
+            byte[] temp = new byte[len];
+            Random r = new Random();
+            for (int i = 0; i < len; ++i)
+                temp[i] = (byte)r.Next(256);
             return ret.ToString();
         }
     }
