@@ -13,9 +13,10 @@ namespace SymmetricEncryption
         public string Expand(string str, int size = -1)
         {
             StringBuilder ret = new StringBuilder();
-            using (MD5 md5 = MD5.Create())
+            
+            using (SHA512 sha = SHA512.Create())
             {
-                byte[] data = md5.ComputeHash(Encoding.UTF8.GetBytes(str));
+                byte[] data = sha.ComputeHash(Encoding.UTF8.GetBytes(str));
                 
                 string temp = Encoding.UTF8.GetString(data);
                 if (size == -1)

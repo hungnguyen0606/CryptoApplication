@@ -19,27 +19,23 @@ namespace SymmetricEncryption
             if (et == 0)
             {
                 EncryptionType = new RijndaelManaged();
-                //EncryptionType.BlockSize = EncryptionType.LegalBlockSizes[0];
             }
             else
             {
                 EncryptionType = new TripleDESCryptoServiceProvider();    
             }
 
-            //generate random Initial Vector
-            EncryptionType.GenerateIV();
-            //check the key's size
-            var key = Encoding.ASCII.GetBytes(pass);
-            if (!EncryptionType.ValidKeySize(key.Length*8))
-                return false;
-            EncryptionType.Key = key;
-            //EncryptionType.KeySize = key.Length*8;
-            //
             //set padding mode
             EncryptionType.Padding = padMode == 0 ? PaddingMode.PKCS7 : PaddingMode.ISO10126;
             //set mode of operation
             EncryptionType.Mode = ciMode == 0 ? CipherMode.CBC : CipherMode.CFB;
-            //
+            //generate random Initial Vector
+            EncryptionType.GenerateIV();
+           
+            Tool t = new Tool();
+            var key = Encoding.ASCII.GetBytes(t.Expand(pass, EncryptionType.KeySize/8));
+            EncryptionType.Key = key;
+            
             ICryptoTransform transform = EncryptionType.CreateEncryptor();
             
             //prepare header
@@ -49,7 +45,7 @@ namespace SymmetricEncryption
             byte[] mEncryptionType = new byte[4];
             byte[] mModeOperation = new byte[4];
 
-            LenKey = BitConverter.GetBytes(EncryptionType.KeySize / 8);
+            LenKey = BitConverter.GetBytes(EncryptionType.KeySize);
             LenIV = BitConverter.GetBytes(EncryptionType.IV.Length);
             mPadMode = BitConverter.GetBytes(padMode);
             mEncryptionType = BitConverter.GetBytes(et);
@@ -120,7 +116,9 @@ namespace SymmetricEncryption
                     myEncryption = new TripleDESCryptoServiceProvider();
                 //
                 //myEncryption.KeySize = BitConverter.ToInt32(LenKey, 0);
-                myEncryption.Key = Encoding.ASCII.GetBytes(pass);
+                int ks = BitConverter.ToInt32(LenKey,0);
+                Tool t = new Tool();
+                myEncryption.Key = Encoding.ASCII.GetBytes(t.Expand(pass, ks / 8));
                 byte[] iv = new byte[BitConverter.ToInt32(LenIV, 0)];
                 inFs.Read(iv, 0, iv.Length);
 
@@ -141,13 +139,6 @@ namespace SymmetricEncryption
                     int blockSizeBytes = myEncryption.BlockSize / 8;
                     byte[] data = new byte[blockSizeBytes];
 
-
-                    // By decrypting a chunk a time,
-                    // you can save memory and
-                    // accommodate large files.
-
-                    // Start at the beginning
-                    // of the cipher text.
                     inFs.Seek(20 + iv.Length, SeekOrigin.Begin);
                     using (CryptoStream outStreamDecrypted = new CryptoStream(outFs, transform, CryptoStreamMode.Write))
                     {
