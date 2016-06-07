@@ -1,0 +1,57 @@
+		Ôn tập:
+Quy trình giải mã: 0.5
+- encrypt -> decrypt
+- xor -> xor
+
+Lỗi khi giải mã: 0.5
+- c[i] bị lỗi một (hay một số) bit, phân tích việc giả mã và lan truyền lỗi.
+- decrypt với thao tác xor: sai ở những bit bị sai ở input
+- decrypt với thao tác encrypt hay decrypt: nếu input bị sai (dù chỉ 1 bit) thì không thể tin tưởng vào bất kỳ bit nào trong output.
+
+Khả năng song song hóa khi xử lý (mã hóa/ giải mã): 0.5
+--------------------------------------------------------
+Tính số nghịch đảo: 1.0
+a = b^(-1) mod n
+RSA:
+n = p*q
+phi(n) = (p-1)(q-1)
+a = b^(-1) mod phi(n)
+--------------------------------------------------------
+Tạo chữ ký:
+- Tài liêu -> Hash
+- Ký trên hash (hash có format đặc biệt)
+- Giải mã chữ ký  với public key( của người mà mình nghĩ là dã ký)
+- Giải mã: kết quả có format đúng => chữ ký THẬT
+- Kết quả có format sai: chữ ký KHÔNG thật
+- Nếu hash (tách ra từ chữ ký sau khi giải mã) giống với hash của nội dung -> chữ ký phù hợp tài liệu
+--------------------------------------------------------
+Kerberos + SSL:
+Quy trình chứng thực (2 chiều)
+
+PKI (Public Key Infrastructure), có CA (certificate authority), Digital Certificate và Public Key.
+- Challenge để biết đối tác còn lại thật sự là ai
+- Thường mỗi phía đều có 1 random để challenge phía còn lại.
+Kerberos:
+- Pre-shared Key
+- Giới thiệu
+- KHi có request thì luôn response (và encrypt nội dung theo preshared-key/sesion key). Nếu đúng là người nhận hợp lệ thì sẽ decrypt được, nếu không thì khó biết được kết quả trong response.
+
+
+HASH + RANDOM
+--------------------------------------------------------
+14/06: 
+- Bài tập CUỐI KỲ Lập trình
+- Bài tập CUỐI KỲ Lý thuyết <==
+
+1đ: bài tập đã nộp + 2 lần làm trong lớp + 2 lần nộp bài tập nhỏ
+
+--------------------------------------------------------
+Steganography
+Watermarking
+Watermark
+Cover Channel
+
+- Properties:
+-- Invisibility
+-- Robustness
+-- Capacity
