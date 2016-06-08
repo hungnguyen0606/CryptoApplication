@@ -37,7 +37,7 @@ using CryptoPP::PK_EncryptorFilter;
 using CryptoPP::PK_DecryptorFilter;
 
 #include <des.h>
-using CryptoPP::DES_EDE2;
+using CryptoPP::DES_EDE3;
 
 #include <aes.h>
 using CryptoPP::AES;
@@ -90,13 +90,13 @@ extern AutoSeededRandomPool prng;
 #define SIGMK 7
 #define SIGCK 8
 
-#define KELEN 32
+#define KELEN 24
 string Encrypt(const string& plain, byte* key, byte* iv, bool aes = true);
 string Decrypt(const string& cipher, byte* key, byte* iv, bool aes = true);
 
 #define DELIM "#####"
 #define DATAL "database"
-#define MAPAS "NguyePhanManhHungNguyeDinhAnVinh"
+#define MAPAS "NPhanManhHungNDinhAnVinh"
 extern string MAIVE;
 
 extern string MAPUB;

@@ -7,12 +7,12 @@ string Encrypt(const string& plain, byte* key, byte* iv, bool aes)
 	if (aes)
 	{
 		e = new CBC_Mode<AES>::Encryption;
-		((CBC_Mode<AES>::Encryption*)e)->SetKeyWithIV(key, KELEN, iv);
+		((CBC_Mode<AES>::Encryption*)e)->SetKeyWithIV(key, KELEN, iv, AES::BLOCKSIZE);
 	}
 	else
 	{
-		e = new CBC_Mode<DES_EDE2>::Encryption;
-		((CBC_Mode<DES_EDE2>::Encryption*)e)->SetKeyWithIV(key, KELEN, iv);
+		e = new CBC_Mode<DES_EDE3>::Encryption;
+		((CBC_Mode<DES_EDE3>::Encryption*)e)->SetKeyWithIV(key, KELEN, iv, DES_EDE3::BLOCKSIZE);
 	}
 
 	string cipher;
@@ -31,12 +31,12 @@ string Decrypt(const string& cipher, byte* key, byte* iv, bool aes)
 	if (aes)
 	{
 		d = new CBC_Mode<AES>::Decryption;
-		((CBC_Mode<AES>::Encryption*)d)->SetKeyWithIV(key, KELEN, iv);
+		((CBC_Mode<AES>::Encryption*)d)->SetKeyWithIV(key, KELEN, iv, AES::BLOCKSIZE);
 	}
 	else
 	{
-		d = new CBC_Mode<DES_EDE2>::Decryption;
-		((CBC_Mode<DES_EDE2>::Encryption*)d)->SetKeyWithIV(key, KELEN, iv);
+		d = new CBC_Mode<DES_EDE3>::Decryption;
+		((CBC_Mode<DES_EDE3>::Encryption*)d)->SetKeyWithIV(key, KELEN, iv, DES_EDE3::BLOCKSIZE);
 	}
 
 	string plain;

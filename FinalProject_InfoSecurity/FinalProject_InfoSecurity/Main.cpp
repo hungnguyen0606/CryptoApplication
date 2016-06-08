@@ -8,10 +8,9 @@
 #include "FileEnc.h"
 string MAPUB = "";
 string MAPRI = "";
-int ARGS[] = {0, 3, 4, 4, 4, 5, 5, 4, 5};
+int ARGS[] = {0, 3, 4, 4, 4, 7, 5, 4, 5};
 string MAIVE = "0123456789ABCDEF";
 AutoSeededRandomPool prng;
-
 
 int main(int argc, char* argv[])
 {
@@ -86,10 +85,10 @@ int main(int argc, char* argv[])
 	}
 	case DOCEN:
 	{
-		string src(argv[3]);
-		string dest(argv[4]);
-		string email("what is the email");
-		int choice = atoi(argv[5]);
+		string src(argv[4]);
+		string dest(argv[5]);
+		string email(argv[3]);
+		int choice = atoi(argv[6]);
 		bool isAES;
 		bool err = false;
 		switch (choice)
@@ -105,22 +104,22 @@ int main(int argc, char* argv[])
 		}
 		if (err)
 		{
-			cout << "Enter 0 to use AES, 1 to use 3DES.";
+			cout << "Enter 0 to use AES, 1 to use 3DES." << endl;
 			break;
 		}
 		if (encryptFile(src, dest, isAES, email))
-			cout << "Finished encrypting the file.";
+			cout << "Finished encrypting the file." << endl;
 		else
-			cout << "Failed to encrypt the file.";
+			cout << "Failed to encrypt the file." << endl;
 		break;
 	}
 		
 	case DOCDE:
 	{
 		if (decryptFile(string(argv[3]), string(argv[4]), result))
-			cout << "Finished decrypting the file.";
+			cout << "Finished decrypting the file." << endl;
 		else
-			cout << "Failed to decrypt the file.";
+			cout << "Failed to decrypt the file." << endl;
 		break;
 	}
 		
@@ -132,13 +131,13 @@ int main(int argc, char* argv[])
 		
 		if (sig == "")
 		{
-			cout << "Cannot create file's signature.";
+			cout << "Cannot create file's signature." << endl;
 			break;
 		}
 		ofstream ofs(dest, std::ios::binary);
 		ofs << sig;
 		ofs.close();
-		cout << "Finished creating the signature.";
+		cout << "Finished creating the signature." << endl;
 		break;
 	}
 		
@@ -147,9 +146,9 @@ int main(int argc, char* argv[])
 		string src(argv[3]);
 		string dest(argv[4]);
 		if (verifySignature(src, dest))
-			cout << "The file's signature is correct.";
+			cout << "The file's signature is correct." << endl;
 		else
-			cout << "The file's signature is incorrect.";
+			cout << "The file's signature is incorrect." << endl;
 		break;
 	}
 		

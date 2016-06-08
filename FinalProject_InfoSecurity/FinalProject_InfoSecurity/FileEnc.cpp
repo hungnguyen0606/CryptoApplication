@@ -1,33 +1,68 @@
 #include "FileEnc.h"
+#include <hex.h>
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
+#include <md5.h>
 
 using CryptoPP::SignerFilter;
 using CryptoPP::SignatureVerificationFilter;
 using CryptoPP::ArraySink;
 
-
+#define UNERR "Unknown exception."
+#define NOOUTPUT "My exception: Cannot create output file."
+#define NOINPUT "My exception: Cannot open source file."
+#define NOLOADKEY "Cannot load the key."
 std::string makeSignature(const string& path, string PrivateKey)
 {
-	DSA::PrivateKey privateKey;
-	//call load key
-	bool isOk = LoadKey(PrivateKey, privateKey);
-	assert(isOk);
-    //------------------------------------------------
-	ifstream ifs(path, std::ios::binary);
-	if (!ifs.good())
-		return string();
+	try
+	{
+		RSA::PrivateKey privateKey;
+		//call load key
+		bool isOk = LoadKey(PrivateKey, privateKey);
+		
+		
+		//DSA::PrivateKey prk(privateKey);
+		if (!isOk)
+			throw string(NOLOADKEY);
+	
+		ifstream ifs(path, std::ios::binary);
+		if (!ifs.good())
+			throw string(NOINPUT);
+		string message((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
 
-	string message((istreambuf_iterator<char>(ifs)), 
-		(istreambuf_iterator<char>()));
-	string ret;
+		//byte digest[CryptoPP::Weak::MD5::DIGESTSIZE];
+		////std::string message = "abcdefghijklmnopqrstuvwxyz";
+		//CryptoPP::Weak::MD5 hash;
+		//hash.CalculateDigest(digest, (const byte*)message.c_str(), message.length());
 
-	DSA::Signer signer(privateKey);
-	StringSource ss1(message, true,
-		new SignerFilter(prng, signer,
-		new StringSink(ret)
-		) // SignerFilter
-		); // StringSource
+		//string temp(digest, digest + CryptoPP::Weak::MD5::DIGESTSIZE);
+		//string Digest = "";
+		//for (int i = 0; i < 8; ++i)
+		//	Digest += temp;
+		SHA256 hash;
+		string ret, digest;
+		
+		FileSource f(path.c_str(), true, new CryptoPP::HashFilter(hash, new CryptoPP::HexEncoder(new StringSink(digest))));
+		RSAES_OAEP_SHA_Encryptor e(privateKey);
+		StringSource ss1(digest, true, new PK_EncryptorFilter(prng, e, new StringSink(ret)));
 
-	return ret;
+		return ret;
+	}
+	catch (string e)
+	{
+		cout << e << endl;
+		return "";
+	}
+	catch (const std::exception& e)
+	{
+		cout << e.what() << endl;
+		return "";
+	}
+	catch (...)
+	{
+		cout << UNERR;
+		return "";
+	}
+	
 }
 
 static bool verifySignature(const string& message, const string& signature, DSA::PublicKey publicKey)
@@ -49,115 +84,184 @@ static bool verifySignature(const string& message, const string& signature, DSA:
 
 int verifySignature(const string& pathFile, const string& pathSign)
 {
-	ifstream ifsM(pathFile, std::ios::binary);
-	ifstream ifsS(pathSign, std::ios::binary);
-
-	if (!ifsM.good() || !ifsS.good())
-		return false;
-
-	string message((istreambuf_iterator<char>(ifsM)),
-		(istreambuf_iterator<char>()));
-
-	string signature((istreambuf_iterator<char>(ifsS)),
-		(istreambuf_iterator<char>()));
-
-	vector<string> data = SearchDatabase("", -1, PUBKE);
-	for (int i = 0; i < data.size(); ++i)
+	try
 	{
-		string temp = data[i].substr(data[i].find_last_of(DELIM) + 1);
-		temp.pop_back();
+		ifstream ifsM(pathFile, std::ios::binary);
+		if (!ifsM.good())
+			return false;
+		ifstream ifsS(pathSign, std::ios::binary);
+		if (!ifsS.good())
+			return false;
 
-		DSA::PublicKey myKey;
-		LoadKey(data[i], myKey);
-		if (verifySignature(message, signature, myKey))
+		string message((istreambuf_iterator<char>(ifsM)),
+			(istreambuf_iterator<char>()));
+
+		string signature((istreambuf_iterator<char>(ifsS)),
+			(istreambuf_iterator<char>()));
+
+		vector<string> data = SearchDatabase("", -1, PUBKE);
+		for (int i = 0; i < data.size(); ++i)
 		{
-			//string name = data[i].substr(data[i].find_first_of(DELIM) + 1);
-			vector<string> name = SearchDatabase(data[i], PUBKE, 1);
-			assert(name.size() > 0);
-			cout << name[0] << " signed this file.";
-			return i;
+
+			RSA::PublicKey myKey;
+			LoadKey(data[i], myKey);
+
+			SHA256 hash;
+			string digest, ret;
+
+			FileSource f(pathFile.c_str(), true, new CryptoPP::HashFilter(hash, new CryptoPP::HexEncoder(new StringSink(digest))));
+			RSAES_OAEP_SHA_Decryptor d(myKey);
+			string temp;
+			StringSource ss2(signature, true, new PK_DecryptorFilter(prng, d, new StringSink(temp)));
+			
+			//if (temp == digest)
+			//	return true;
+			
+			//StringSource ss1(digest, true, new PK_EncryptorFilter(prng, e, new StringSink(ret)));
 		}
+		return false;
 	}
-	return -1;
+	catch (const std::exception& e)
+	{
+		cout << e.what() << endl;
+		return false;
+	}
+	catch (...)
+	{
+		cout << UNERR;
+		return false;
+	}
+	
 }
 
 bool encryptFile(const string& src, const string& dest, bool isAES, const string& email)
 {
-	vector<string> temp = SearchDatabase(email, 0, 8);
-	
-	if (temp.size() < 1)
+	try
+	{
+		vector<string> temp = SearchDatabase(email, 0, 8);
+
+		if (temp.size() < 1)
+			throw string("This email doesn't exist.");
+
+		ifstream ifs(src, std::ios::binary);
+		if (!ifs.good())
+			throw string(NOINPUT);
+
+		ofstream ofs(dest, std::ios::binary);
+		if (!ofs.good())
+			throw string(NOOUTPUT);
+
+		string message((istreambuf_iterator<char>(ifs)),
+			(istreambuf_iterator<char>()));
+
+		string PublicKey = temp[0];
+
+		//encrypt file
+		string cipher;
+		byte* key = new byte[KELEN];
+		byte* iv;
+		int lenIV = (isAES) ? AES::BLOCKSIZE : DES_EDE3::BLOCKSIZE;
+
+		prng.GenerateBlock(key, KELEN);
+		iv = new byte[lenIV];
+		prng.GenerateBlock(iv, lenIV);
+
+		//Encrypt(message, key, iv, isAES);
+		cipher = Encrypt(message, key, iv, isAES);
+		//encrypt secret key by public key of receiver
+		string kiv = string(key, key + KELEN) + string(iv, iv + lenIV);
+		string ckiv;
+
+		RSA::PublicKey publicKey;
+		LoadKey(PublicKey, publicKey);
+		RSAES_OAEP_SHA_Encryptor e(publicKey);
+
+		StringSource ss1(kiv, true, new PK_EncryptorFilter(prng, e, new StringSink(ckiv)));
+		int ll = ckiv.length();
+		string lenCkiv((char*)&ll, ((char*)&ll) + sizeof(int));
+		//final cipher
+		string fcipher = string(1, char(isAES)) + lenCkiv + ckiv + cipher;
+		ofs << fcipher;
+		ofs.close();
+
+		return true;
+	}
+	catch (string e)
+	{
+		cout << e << endl;
 		return false;
-	ifstream ifs(src, std::ios::binary);
-
-	if (!ifs.good())
+	}
+	catch (const std::exception& e)
+	{
+		cout << e.what() << endl;
 		return false;
-
-	string message((istreambuf_iterator<char>(ifs)),
-		(istreambuf_iterator<char>()));
+	}
+	catch (...)
+	{
+		cout << UNERR;
+		return false;
+	}
 	
-	string PublicKey = temp[0];
-
-	//encrypt file
-	string cipher;
-	byte* key = new byte[KELEN];
-	byte* iv;
-	int lenIV = (isAES)? AES::BLOCKSIZE: DES_EDE2::BLOCKSIZE;
-
-	prng.GenerateBlock(key, KELEN);
-	iv = new byte[lenIV];
-	prng.GenerateBlock(iv, lenIV);
-			
-	//Encrypt(message, key, iv, isAES);
-	cipher = Encrypt(message, key, iv, isAES);
-	//encrypt secret key by public key of receiver
-	string kiv = string(key, key + KELEN) + string(iv, iv + lenIV);
-	string ckiv;
-
-	RSA::PublicKey publicKey;
-	LoadKey(PublicKey, publicKey);
-	RSAES_OAEP_SHA_Encryptor e(publicKey);
-	
-	StringSource ss1(kiv, true, new PK_EncryptorFilter(prng, e,	new StringSink(ckiv)));
-	
-	//final cipher
-	string fcipher = string(1, char(isAES)) + ckiv + cipher;
-	
-	return true;
 }
 
 bool decryptFile(const string& src, const string& dest, const string& PrivateKey)
 {
-	int prefix = KELEN + 1;
-	string cipher;
-	bool isAES = int(cipher[0]) > 0;
-	prefix += isAES? AES::BLOCKSIZE: DES_EDE2::BLOCKSIZE; // 1 + KELEN + BLOCKSIZE
-	string ckiv = cipher.substr(1, prefix - 1);
-	cipher = cipher.substr(prefix);
+	try
+	{
+		ifstream ifs(src, std::ios::binary);
+		if (!ifs.good())
+			throw string(NOINPUT);
 
-	//get private key
-	//string PrivateKey = LogIn("something here I dont know");
-	RSA::PrivateKey privateKey;
-	LoadKey(PrivateKey, privateKey);
+		string cipher((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
 
-	//restore symmetric key and iv
-	string kiv;
-	RSAES_OAEP_SHA_Decryptor d(privateKey);
-	StringSource ss2(ckiv, true, new PK_DecryptorFilter(prng, d, new StringSink(kiv))); 
+		int ll = *(int*)(cipher.c_str() + 1);
+		int prefix = 1 + sizeof(int)+ll;
 
-	byte *key = new byte[KELEN];
-	byte *iv = new byte[kiv.length() - KELEN];
+		bool isAES = int(cipher[0]) > 0;
+		//prefix += isAES? AES::BLOCKSIZE: DES_EDE2::BLOCKSIZE; // 1 + KELEN + BLOCKSIZE
+		string ckiv = cipher.substr(1 + sizeof(int), ll);
+		cipher = cipher.substr(prefix);
 
-	memcpy(key, kiv.c_str(), KELEN);
-	memcpy(iv, kiv.c_str(), kiv.length() - KELEN);
+		//get private key
+		//string PrivateKey = LogIn("something here I dont know");
+		RSA::PrivateKey privateKey;
+		LoadKey(PrivateKey, privateKey);
 
-	string message = Decrypt(cipher, key, iv, isAES);
+		//restore symmetric key and iv
+		string kiv;
+		RSAES_OAEP_SHA_Decryptor d(privateKey);
+		StringSource ss2(ckiv, true, new PK_DecryptorFilter(prng, d, new StringSink(kiv)));
 
-	//create plaintext-file
-	ofstream ofs(dest, std::ios::binary);
-	if (!ofs.good())
+		byte *key = new byte[KELEN];
+		byte *iv = new byte[kiv.length() - KELEN];
+
+		memcpy(key, kiv.c_str(), KELEN);
+		memcpy(iv, kiv.c_str(), kiv.length() - KELEN);
+
+		string message = Decrypt(cipher, key, iv, isAES);
+
+		//create plaintext-file
+		ofstream ofs(dest, std::ios::binary);
+		if (!ofs.good())
+			throw string(NOOUTPUT);
+		ofs << message;
+		ofs.close();
+		return true;
+	}
+	catch (string e)
+	{
+		cout << e << endl;
 		return false;
-	ofs << message;
-	ofs.close();
+	}
+	catch (const std::exception& e)
+	{
+		cout << e.what() << endl;
+		return false;
+	}
+	catch (...)
+	{
+		cout << UNERR << endl;
+		return false;
+	}
 	
-	return true;
 }
