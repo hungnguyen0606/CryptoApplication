@@ -1,12 +1,16 @@
 #include "FileEnc.h"
 #include <hex.h>
+#include <pubkey.h>
+#include <secblock.h>
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
 #include <md5.h>
+//#include <rsa.h>
 
 using CryptoPP::SignerFilter;
 using CryptoPP::SignatureVerificationFilter;
 using CryptoPP::ArraySink;
-
+using CryptoPP::RSASSA_PKCS1v15_SHA_Signer;
+using CryptoPP::RSASSA_PKCS1v15_SHA_Verifier;
 #define UNERR "Unknown exception."
 #define NOOUTPUT "My exception: Cannot create output file."
 #define NOINPUT "My exception: Cannot open source file."
@@ -17,11 +21,7 @@ std::string makeSignature(const string& path, string PrivateKey)
 	{
 		RSA::PrivateKey privateKey;
 		//call load key
-		bool isOk = LoadKey(PrivateKey, privateKey);
-		
-		
-		//DSA::PrivateKey prk(privateKey);
-		if (!isOk)
+		if (!LoadKey(PrivateKey, privateKey))
 			throw string(NOLOADKEY);
 	
 		ifstream ifs(path, std::ios::binary);
@@ -29,23 +29,15 @@ std::string makeSignature(const string& path, string PrivateKey)
 			throw string(NOINPUT);
 		string message((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
 
-		//byte digest[CryptoPP::Weak::MD5::DIGESTSIZE];
-		////std::string message = "abcdefghijklmnopqrstuvwxyz";
-		//CryptoPP::Weak::MD5 hash;
-		//hash.CalculateDigest(digest, (const byte*)message.c_str(), message.length());
+		//sign message
+		RSASSA_PKCS1v15_SHA_Signer signer(privateKey);
+		size_t length = signer.MaxSignatureLength();
+		CryptoPP::SecByteBlock signature(length);
+		length = signer.SignMessage(prng, (const byte*)message.c_str(),
+			message.length(), signature);
+		signature.resize(length);
 
-		//string temp(digest, digest + CryptoPP::Weak::MD5::DIGESTSIZE);
-		//string Digest = "";
-		//for (int i = 0; i < 8; ++i)
-		//	Digest += temp;
-		SHA256 hash;
-		string ret, digest;
-		
-		FileSource f(path.c_str(), true, new CryptoPP::HashFilter(hash, new CryptoPP::HexEncoder(new StringSink(digest))));
-		RSAES_OAEP_SHA_Encryptor e(privateKey);
-		StringSource ss1(digest, true, new PK_EncryptorFilter(prng, e, new StringSink(ret)));
-
-		return ret;
+		return string(signature.begin(), signature.end());
 	}
 	catch (string e)
 	{
@@ -65,21 +57,6 @@ std::string makeSignature(const string& path, string PrivateKey)
 	
 }
 
-static bool verifySignature(const string& message, const string& signature, DSA::PublicKey publicKey)
-{
-	DSA::Verifier verifier(publicKey);
-	bool result = false;
-	StringSource ss(message + signature, true,
-		new SignatureVerificationFilter(
-		verifier,
-		new ArraySink(
-		(byte*)&result, sizeof(result)),
-		SignatureVerificationFilter::Flags::PUT_RESULT | SignatureVerificationFilter::Flags::SIGNATURE_AT_END
-		)
-		);
-
-	return result;
-}
 
 
 int verifySignature(const string& pathFile, const string& pathSign)
@@ -88,16 +65,16 @@ int verifySignature(const string& pathFile, const string& pathSign)
 	{
 		ifstream ifsM(pathFile, std::ios::binary);
 		if (!ifsM.good())
-			return false;
+			throw string(NOINPUT);
 		ifstream ifsS(pathSign, std::ios::binary);
 		if (!ifsS.good())
-			return false;
-
-		string message((istreambuf_iterator<char>(ifsM)),
-			(istreambuf_iterator<char>()));
-
-		string signature((istreambuf_iterator<char>(ifsS)),
-			(istreambuf_iterator<char>()));
+		{
+			ifsM.close();
+			throw string(NOINPUT);
+		}
+			
+		string message((istreambuf_iterator<char>(ifsM)), (istreambuf_iterator<char>()));
+		string signature((istreambuf_iterator<char>(ifsS)),	(istreambuf_iterator<char>()));
 
 		vector<string> data = SearchDatabase("", -1, PUBKE);
 		for (int i = 0; i < data.size(); ++i)
@@ -106,19 +83,22 @@ int verifySignature(const string& pathFile, const string& pathSign)
 			RSA::PublicKey myKey;
 			LoadKey(data[i], myKey);
 
-			SHA256 hash;
-			string digest, ret;
-
-			FileSource f(pathFile.c_str(), true, new CryptoPP::HashFilter(hash, new CryptoPP::HexEncoder(new StringSink(digest))));
-			RSAES_OAEP_SHA_Decryptor d(myKey);
-			string temp;
-			StringSource ss2(signature, true, new PK_DecryptorFilter(prng, d, new StringSink(temp)));
-			
-			//if (temp == digest)
-			//	return true;
-			
-			//StringSource ss1(digest, true, new PK_EncryptorFilter(prng, e, new StringSink(ret)));
+			//verify message
+			RSASSA_PKCS1v15_SHA_Verifier verifier(myKey);
+			bool result = verifier.VerifyMessage((const byte*)message.c_str(),
+				message.length(), (const byte*)signature.c_str(), signature.size());
+			if (result)
+			{
+				vector<string> mail = SearchDatabase(data[i], PUBKE, EMAIL);
+				cout << "This file has been signed by " + mail[0] << endl;
+				return true;
+			}
 		}
+		return false;
+	}
+	catch (string e)
+	{
+		cout << e << endl;
 		return false;
 	}
 	catch (const std::exception& e)
@@ -149,7 +129,12 @@ bool encryptFile(const string& src, const string& dest, bool isAES, const string
 
 		ofstream ofs(dest, std::ios::binary);
 		if (!ofs.good())
+		{
+			if (ifs.is_open()) 
+				ifs.close();
 			throw string(NOOUTPUT);
+		}
+			
 
 		string message((istreambuf_iterator<char>(ifs)),
 			(istreambuf_iterator<char>()));
@@ -159,7 +144,7 @@ bool encryptFile(const string& src, const string& dest, bool isAES, const string
 		//encrypt file
 		string cipher;
 		byte* key = new byte[KELEN];
-		byte* iv;
+		byte* iv = NULL;
 		int lenIV = (isAES) ? AES::BLOCKSIZE : DES_EDE3::BLOCKSIZE;
 
 		prng.GenerateBlock(key, KELEN);
@@ -184,6 +169,11 @@ bool encryptFile(const string& src, const string& dest, bool isAES, const string
 		ofs << fcipher;
 		ofs.close();
 
+		if (key != NULL) 
+			delete[]key;
+		if (iv != NULL)	
+			delete[]iv;
+		
 		return true;
 	}
 	catch (string e)
@@ -236,16 +226,30 @@ bool decryptFile(const string& src, const string& dest, const string& PrivateKey
 		byte *iv = new byte[kiv.length() - KELEN];
 
 		memcpy(key, kiv.c_str(), KELEN);
-		memcpy(iv, kiv.c_str(), kiv.length() - KELEN);
+		memcpy(iv, kiv.c_str()+KELEN, kiv.length() - KELEN);
 
 		string message = Decrypt(cipher, key, iv, isAES);
 
 		//create plaintext-file
 		ofstream ofs(dest, std::ios::binary);
 		if (!ofs.good())
+		{
+			if (ifs.is_open()) 
+				ifs.close();
+			if (key != NULL) 
+				delete[]key;
+			if (iv != NULL)	
+				delete[]iv;
 			throw string(NOOUTPUT);
+		}
+			
 		ofs << message;
 		ofs.close();
+
+		if (key != NULL) 
+			delete[]key;
+		if (iv != NULL)
+			delete[]iv;
 		return true;
 	}
 	catch (string e)
@@ -265,3 +269,19 @@ bool decryptFile(const string& src, const string& dest, const string& PrivateKey
 	}
 	
 }
+
+//static bool verifySignature(const string& message, const string& signature, DSA::PublicKey publicKey)
+//{
+//	DSA::Verifier verifier(publicKey);
+//	bool result = false;
+//	StringSource ss(message + signature, true,
+//		new SignatureVerificationFilter(
+//		verifier,
+//		new ArraySink(
+//		(byte*)&result, sizeof(result)),
+//		SignatureVerificationFilter::Flags::PUT_RESULT | SignatureVerificationFilter::Flags::SIGNATURE_AT_END
+//		)
+//		);
+//
+//	return result;
+//}
